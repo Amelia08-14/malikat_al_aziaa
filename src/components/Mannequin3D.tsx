@@ -1,234 +1,207 @@
 "use client";
 
-import React, { useMemo } from "react";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls, PerspectiveCamera, Environment, ContactShadows } from "@react-three/drei";
-import * as THREE from "three";
 
 interface BodyStats {
-  gender: "female" | "male";
-  height: number;
-  weight: number;
-  age: number;
-  chest: number;
-  waist: number;
-  hips: number;
+  gender:    "female" | "male";
+  height:    number;
+  weight:    number;
+  age:       number;
+  chest:     number;
+  waist:     number;
+  hips:      number;
+  skinTone?: string; // hex colour — applied as multiply tint over the mannequin
 }
 
-const cToR = (cm: number) => (cm / 100) / (2 * Math.PI) * 1.22;
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-function buildDims(stats: BodyStats) {
-  const s  = stats.height / 100;
-  const sw = Math.max(40, stats.height - 100);
-  const wF = Math.pow(stats.weight / sw, 0.38);
-
-  const chR    = cToR(stats.chest);
-  const wstR   = cToR(stats.waist);
-  const hipR   = cToR(stats.hips);
-  const shldrR = chR * 1.28;
-
-  const neckR  = 0.037 * s;
-  const headR  = 0.108 * s;
-  const armR   = 0.022 * s * wF;
-  const thighR = hipR  * 0.43 * Math.pow(wF, 0.25);
-  const calfR  = thighR * 0.63;
-  const footR  = calfR  * 0.74;
-
-  const ankleY    = 0.070 * s;
-  const kneeY     = 0.310 * s;
-  const hipBotY   = 0.500 * s;
-  const shoulderY = 0.860 * s;
-  const neckBotY  = shoulderY;
-  const neckTopY  = 0.910 * s;
-  const headCY    = 0.952 * s;
-
-  const torsoH = shoulderY - hipBotY;
-  const tH     = torsoH;
-
-  const torsoProfile: THREE.Vector2[] = [
-    new THREE.Vector2(0.010,          0),
-    new THREE.Vector2(hipR * 0.82,   tH * 0.03),
-    new THREE.Vector2(hipR * 1.06,   tH * 0.17),
-    new THREE.Vector2(wstR,           tH * 0.38),
-    new THREE.Vector2(chR  * 0.91,   tH * 0.55),
-    new THREE.Vector2(chR,            tH * 0.67),
-    new THREE.Vector2(chR  * 0.87,   tH * 0.79),
-    new THREE.Vector2(shldrR * 0.63, tH * 0.90),
-    new THREE.Vector2(neckR  * 1.55, tH * 0.97),
-    new THREE.Vector2(neckR,          tH),
+function hexToRgb(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16),
+    parseInt(hex.slice(3, 5), 16),
+    parseInt(hex.slice(5, 7), 16),
   ];
-
-  const upperArmH = 0.175 * s;
-  const lowerArmH = 0.155 * s;
-  const armAngle  = 0.22;
-  const armX0     = shldrR * 0.62;
-
-  const armJoints = (side: number) => {
-    const sx = side * armX0;
-    const ex = sx + side * upperArmH * Math.sin(armAngle);
-    const ey = shoulderY - upperArmH;
-    const wx = ex + side * lowerArmH * Math.sin(armAngle * 0.5);
-    const wy = ey - lowerArmH;
-    return { sx, ex, ey, wx, wy };
-  };
-
-  const legSpreadX = hipR * 0.58;
-  const groupY = -0.60 * s;
-
-  return {
-    s, chR, wstR, hipR, shldrR, neckR, headR, armR, thighR, calfR, footR,
-    ankleY, kneeY, hipBotY, shoulderY, neckBotY, neckTopY, headCY,
-    torsoH, torsoProfile,
-    upperArmH, lowerArmH, armAngle, armX0, armJoints,
-    legSpreadX, groupY,
-  };
 }
 
-const cLen = (total: number, r: number) => Math.max(0.002, total - 2 * r);
+// Body that the mannequin PNG represents
+const REF = { chest: 102, waist: 86, hips: 112, height: 165 };
 
-// White plastic mannequin material — smooth, matte, store-style
-const MAT = { color: "#f4f2ef", roughness: 0.10, metalness: 0.04 } as const;
+// Gaussian bell — influence weight centred on a body zone
+const G = (t: number, c: number, w: number) => { const x = (t - c) / w; return Math.exp(-(x * x)); };
 
-function BodyMesh({ stats }: { stats: BodyStats }) {
-  const d = useMemo(() => buildDims(stats), [
-    stats.height, stats.weight, stats.chest, stats.waist, stats.hips,
-  ]);
+/**
+ * Returns the horizontal scale factor at normalised row t (0 = top, 1 = bottom).
+ *
+ * Anatomy zones (calibrated on the plus-size 3/4-view PNG):
+ *   t ≈ 0.00–0.19  head / neck / shoulders  → always 1.0  (hard cut-off)
+ *   t ≈ 0.29        bust peak
+ *   t ≈ 0.43        waist (narrowest point)
+ *   t ≈ 0.59        widest hip / belly
+ *   t ≈ 0.74        upper thigh             → partial hip effect
+ *   t ≈ 1.00        ankles / feet           → always 1.0
+ *
+ * Each zone's influence is a gaussian so deformations blend smoothly with no sharp seams.
+ */
+function scaleAt(t: number, sC: number, sW: number, sH: number): number {
+  // Everything above the armpits is anatomically fixed
+  if (t < 0.19) return 1.0;
 
-  const upperLegH = d.hipBotY - d.kneeY;
-  const lowerLegH = d.kneeY   - d.ankleY;
+  // Shoulder anchor — narrow gaussian that fades the fixed region into the body below
+  const wSh = G(t, 0.19, 0.030);
+  // Bust (breasts only)
+  const wBu = G(t, 0.29, 0.065);
+  // Waist
+  const wWa = G(t, 0.43, 0.048);
+  // Hips / belly
+  const wHi = G(t, 0.59, 0.068);
+  // Upper thighs — half the hip influence
+  const wTh = G(t, 0.74, 0.058);
+  // Feet anchor (returns to 1.0)
+  const wFt = G(t, 1.00, 0.048);
+
+  const sMid  = (sH + 1.0) / 2; // thigh target = midpoint between hip scale and 1
+  const total = wSh + wBu + wWa + wHi + wTh + wFt;
+  if (total < 1e-6) return 1.0;
 
   return (
-    <group position={[0, d.groupY, 0]}>
+    wSh * 1.0  +
+    wBu * sC   +
+    wWa * sW   +
+    wHi * sH   +
+    wTh * sMid +
+    wFt * 1.0
+  ) / total;
+}
 
-      {/* Torso */}
-      <mesh position={[0, d.hipBotY, 0]} scale={[1, 1, 0.70]} castShadow receiveShadow>
-        <latheGeometry args={[d.torsoProfile, 56]} />
-        <meshStandardMaterial {...MAT} />
-      </mesh>
+function draw(
+  canvas: HTMLCanvasElement,
+  img: HTMLImageElement,
+  sC: number,
+  sW: number,
+  sH: number,
+  skinTone = "#f5f3f0",
+) {
+  const dpr  = window.devicePixelRatio || 1;
+  const cssW = canvas.offsetWidth;
+  const cssH = canvas.offsetHeight;
+  if (cssW === 0 || cssH === 0) return;
 
-      {/* Neck */}
-      <mesh position={[0, (d.neckBotY + d.neckTopY) / 2, 0]} castShadow>
-        <capsuleGeometry args={[d.neckR, cLen(d.neckTopY - d.neckBotY, d.neckR), 8, 16]} />
-        <meshStandardMaterial {...MAT} />
-      </mesh>
+  canvas.width  = cssW * dpr;
+  canvas.height = cssH * dpr;
 
-      {/* Head — slightly elongated (mannequin style) */}
-      <mesh position={[0, d.headCY, 0]} scale={[1, 1.08, 0.94]} castShadow>
-        <sphereGeometry args={[d.headR, 32, 32]} />
-        <meshStandardMaterial {...MAT} />
-      </mesh>
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, cssW, cssH);
 
-      {/* Arms */}
-      {([-1, 1] as const).map(side => {
-        const j = d.armJoints(side);
-        const ua = side * d.armAngle;
-        const fa = side * d.armAngle * 0.5;
-        return (
-          <group key={side}>
-            <mesh
-              position={[(j.sx + j.ex) / 2, (d.shoulderY + j.ey) / 2, 0]}
-              rotation={[0, 0, ua]}
-              castShadow
-            >
-              <capsuleGeometry args={[d.armR, cLen(d.upperArmH, d.armR), 8, 16]} />
-              <meshStandardMaterial {...MAT} />
-            </mesh>
-            <mesh
-              position={[(j.ex + j.wx) / 2, (j.ey + j.wy) / 2, 0]}
-              rotation={[0, 0, fa]}
-              castShadow
-            >
-              <capsuleGeometry args={[d.armR * 0.86, cLen(d.lowerArmH, d.armR * 0.86), 8, 16]} />
-              <meshStandardMaterial {...MAT} />
-            </mesh>
-            {/* Hand */}
-            <mesh position={[j.wx, j.wy, 0]} castShadow>
-              <sphereGeometry args={[d.armR * 1.1, 16, 16]} />
-              <meshStandardMaterial {...MAT} />
-            </mesh>
-          </group>
-        );
-      })}
+  const STRIPS = 400;
+  // Deformation expands/contracts from the visual spine (~47 % from left in this PNG)
+  const PIVOT = 0.47;
+  const MAX_BODY_SCALE = Math.max(sC, sW, sH, 1);
+  const imageRatio = img.naturalWidth / img.naturalHeight;
+  const maxFrameW = cssW * 0.82 / MAX_BODY_SCALE;
+  const maxFrameH = cssH * 0.92;
+  const frameH = Math.min(maxFrameH, maxFrameW / imageRatio);
+  const frameW = frameH * imageRatio;
+  const frameX = (cssW - frameW) / 2;
+  const frameY = cssH - frameH - Math.max(10, cssH * 0.035);
 
-      {/* Legs */}
-      {([-1, 1] as const).map(side => {
-        const lx = side * d.legSpreadX;
-        return (
-          <group key={side}>
-            <mesh position={[lx, (d.hipBotY + d.kneeY) / 2, 0]} castShadow>
-              <capsuleGeometry args={[d.thighR, cLen(upperLegH, d.thighR), 8, 16]} />
-              <meshStandardMaterial {...MAT} />
-            </mesh>
-            <mesh position={[lx, (d.kneeY + d.ankleY) / 2, 0]} castShadow>
-              <capsuleGeometry args={[d.calfR, cLen(lowerLegH, d.calfR), 8, 16]} />
-              <meshStandardMaterial {...MAT} />
-            </mesh>
-            <mesh
-              position={[lx, d.ankleY - d.footR * 0.6, d.footR * 1.1]}
-              rotation={[-Math.PI / 2 + 0.32, 0, 0]}
-              castShadow
-            >
-              <capsuleGeometry args={[d.footR * 0.60, d.footR * 2.2, 6, 14]} />
-              <meshStandardMaterial {...MAT} />
-            </mesh>
-          </group>
-        );
-      })}
-    </group>
-  );
+  for (let i = 0; i < STRIPS; i++) {
+    const t0    = i       / STRIPS;
+    const t1    = (i + 1) / STRIPS;
+    const scale = scaleAt(t0, sC, sW, sH);
+
+    const srcY = t0 * img.naturalHeight;
+    const srcH = (t1 - t0) * img.naturalHeight;
+
+    const dstH = (t1 - t0) * frameH + 1; // +1 prevents sub-pixel gaps between strips
+    const dstY = frameY + t0 * frameH;
+    const dstW = frameW * scale;
+    const dstX = frameX + frameW * PIVOT - dstW * PIVOT; // pivot around spine, not image centre
+
+    ctx.drawImage(img, 0, srcY, img.naturalWidth, srcH, dstX, dstY, dstW, dstH);
+  }
+
+  // Apply skin-tone tint only to mannequin-body pixels — skip near-white background
+  if (skinTone !== "#f5f3f0") {
+    const [tr, tg, tb] = hexToRgb(skinTone);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = imgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 10) continue;                                    // transparent
+      if (d[i] > 244 && d[i + 1] > 244 && d[i + 2] > 244) continue; // white bg
+      d[i]     = (d[i]     * tr) >> 8;
+      d[i + 1] = (d[i + 1] * tg) >> 8;
+      d[i + 2] = (d[i + 2] * tb) >> 8;
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
 }
 
 export default function Mannequin3D({ stats }: { stats: BodyStats }) {
-  const floorY = -(stats.height / 100) * 0.60;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imgRef    = useRef<HTMLImageElement | null>(null);
+
+  const sC   = clamp(stats.chest  / REF.chest,  0.68, 1.36);
+  const sW   = clamp(stats.waist  / REF.waist,  0.64, 1.40);
+  const sH   = clamp(stats.hips   / REF.hips,   0.68, 1.36);
+  const sY   = clamp(stats.height / REF.height, 0.86, 1.14);
+  const tone = stats.skinTone ?? "#f5f3f0";
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const redraw = () => {
+      const img = imgRef.current;
+      if (img?.complete && img.naturalWidth > 0) draw(canvas, img, sC, sW, sH, tone);
+    };
+
+    if (!imgRef.current) {
+      const img = new window.Image();
+      img.src    = "/mannequin.png";
+      img.onload = redraw;
+      imgRef.current = img;
+    } else {
+      redraw();
+    }
+  }, [sC, sW, sH, tone]);
+
+  // Redraw on container resize
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ro = new ResizeObserver(() => {
+      const img = imgRef.current;
+      if (img?.complete) draw(canvas, img, sC, sW, sH, tone);
+    });
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div
-      className="w-full h-full min-h-[500px] cursor-move relative"
-      style={{ background: "linear-gradient(160deg, #ffffff 0%, #f0eeec 100%)" }}
+      className="w-full h-full min-h-[420px] md:min-h-[500px] relative overflow-hidden"
+      style={{ background: "linear-gradient(160deg, #ffffff 0%, #f5f4f2 100%)" }}
     >
-      <Canvas shadows dpr={[1, 2]}>
-        {/* Camera starts at slight 3/4 angle */}
-        <PerspectiveCamera makeDefault position={[0.35, 0.05, 3.5]} fov={42} />
-        <OrbitControls
-          enablePan={false}
-          minPolarAngle={Math.PI / 5}
-          maxPolarAngle={Math.PI / 1.65}
-          minDistance={2.0}
-          maxDistance={6.0}
-          target={[0, 0.05, 0]}
-          autoRotate
-          autoRotateSpeed={0.45}
-        />
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full"
+        style={{
+          display:         "block",
+          transform:       `scaleY(${sY.toFixed(3)})`,
+          transformOrigin: "bottom center",
+          transition:      "transform 0.30s ease-out",
+        }}
+      />
 
-        {/* Clean studio lighting */}
-        <ambientLight intensity={0.80} />
-        <directionalLight
-          position={[2.5, 5, 3]} intensity={1.2} castShadow
-          shadow-mapSize={[1024, 1024]} shadow-bias={-0.0004}
-        />
-        <directionalLight position={[-3, 3, -1]} intensity={0.35} color="#e8f0ff" />
-        <directionalLight position={[0, -1, 2]}  intensity={0.15} color="#ffffff" />
-
-        <Environment preset="studio" />
-
-        <BodyMesh stats={stats} />
-
-        <ContactShadows
-          resolution={512} scale={3.5} blur={3.2} opacity={0.28}
-          position={[0, floorY, 0]}
-        />
-      </Canvas>
-
-      {/* Logo watermark — bottom right */}
-      <div className="absolute bottom-4 left-4 opacity-60 pointer-events-none select-none">
-        <Image
-          src="/logo.png"
-          alt="ملكة الأزياء"
-          width={52}
-          height={52}
-          className="object-contain"
-        />
+      {/* Watermark is outside the canvas — never warps */}
+      <div className="absolute bottom-4 left-4 pointer-events-none select-none z-10">
+        <div className="bg-gray-800/80 rounded-xl p-2 backdrop-blur-sm">
+          <Image src="/logo.png" alt="ملكة الأزياء" width={40} height={40} className="object-contain" />
+        </div>
       </div>
     </div>
   );

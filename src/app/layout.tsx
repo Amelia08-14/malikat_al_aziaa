@@ -11,6 +11,11 @@ const cairo = Cairo({
 export const metadata: Metadata = {
   title: "ملكة الأزياء - غرفة القياس الذكية",
   description: "جربي ملابسك افتراضياً واعرفي مقاسك المناسب",
+  icons: {
+    icon:             "/logo.png",
+    shortcut:         "/logo.png",
+    apple:            "/logo.png",
+  },
 };
 
 export default function RootLayout({

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "PowerShell(Copy-Item -Path \"e:\\\\malikat-al-aziaa\\\\public\\\\logo.png\" -Destination \"e:\\\\malikat-al-aziaa\\\\src\\\\app\\\\icon.png\" -Force)",
+      "PowerShell(if \\($?\\) { \"Copied OK\" } else { \"FAILED\" })"
+    ]
+  }
+}
