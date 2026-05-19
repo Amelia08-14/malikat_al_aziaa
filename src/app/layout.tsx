@@ -12,9 +12,31 @@ export const metadata: Metadata = {
   title: "ملكة الأزياء - غرفة القياس الذكية",
   description: "جربي ملابسك افتراضياً واعرفي مقاسك المناسب",
   icons: {
-    icon:             "/logo.png",
-    shortcut:         "/logo.png",
-    apple:            "/logo.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.png", type: "image/png" },
+      { url: "/logo.png", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/logo.png",
+  },
+  openGraph: {
+    title: "ملكة الأزياء - غرفة القياس الذكية",
+    description: "جربي ملابسك افتراضياً واعرفي مقاسك المناسب",
+    images: [
+      {
+        url: "/logo-horizontal.png",
+        width: 2048,
+        height: 1286,
+        alt: "Malikat Al Azya",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ملكة الأزياء - غرفة القياس الذكية",
+    description: "جربي ملابسك افتراضياً واعرفي مقاسك المناسب",
+    images: ["/logo-horizontal.png"],
   },
 };
 
