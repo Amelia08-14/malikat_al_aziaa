@@ -236,6 +236,8 @@ export interface Product {
   measurements:    Partial<Record<SizeName, Record<string, number>>>;
   note?:           string;
   customCalculate?: (height: number, weight: number) => SizeName;
+  bodySliders?:    Array<'chest' | 'waist' | 'hips' | 'arms'>;
+  gender?:         'female' | 'male';
 }
 
 export function calculateSize(height: number, weight: number, product: Product): SizeName {
@@ -278,7 +280,7 @@ export const PRODUCTS: Product[] = [
   // ── 781 ──────────────────────────────────────────────────────────────────
   {
     code: '781',
-    nameAr: 'مشد ٧٨١',
+    nameAr: 'مشد 781',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_MAIN,
@@ -304,7 +306,7 @@ export const PRODUCTS: Product[] = [
   // ── 782 ──────────────────────────────────────────────────────────────────
   {
     code: '782',
-    nameAr: 'مشد ٧٨٢',
+    nameAr: 'مشد 782',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_MAIN,
@@ -330,7 +332,7 @@ export const PRODUCTS: Product[] = [
   // ── 795 ──────────────────────────────────────────────────────────────────
   {
     code: '795',
-    nameAr: 'مشد ٧٩٥',
+    nameAr: 'مشد 795',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_MAIN,
@@ -358,7 +360,7 @@ export const PRODUCTS: Product[] = [
   // ── 704 ──────────────────────────────────────────────────────────────────
   {
     code: '704',
-    nameAr: 'مشد ٧٠٤',
+    nameAr: 'مشد 704',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_MAIN,
@@ -383,7 +385,7 @@ export const PRODUCTS: Product[] = [
   // ── 706 ──────────────────────────────────────────────────────────────────
   {
     code: '706',
-    nameAr: 'مشد ٧٠٦',
+    nameAr: 'مشد 706',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_MAIN,
@@ -408,11 +410,12 @@ export const PRODUCTS: Product[] = [
   // ── 672 ──────────────────────────────────────────────────────────────────
   {
     code: '672',
-    nameAr: 'مشد ٦٧٢',
+    nameAr: 'مشد 672',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_MAIN,
     availableSizes: ['S','M','L','XL','2XL','3XL','4XL','5XL'],
+    bodySliders: ['chest', 'waist', 'arms'],
     measurementDefs: [
       { key: 'arms',      labelAr: 'الأكمام',      labelEn: 'Arms(CM)'        },
       { key: 'shoulders', labelAr: 'الأكتاف',      labelEn: 'Shoulders(CM)'   },
@@ -433,7 +436,7 @@ export const PRODUCTS: Product[] = [
   // ── 787 ──────────────────────────────────────────────────────────────────
   {
     code: '787',
-    nameAr: 'مشد ٧٨٧',
+    nameAr: 'مشد 787',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_787,
@@ -462,7 +465,7 @@ export const PRODUCTS: Product[] = [
   // ── 789 ──────────────────────────────────────────────────────────────────
   {
     code: '789',
-    nameAr: 'مشد ٧٨٩',
+    nameAr: 'مشد 789',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_789,
@@ -490,11 +493,12 @@ export const PRODUCTS: Product[] = [
   // ── 752 ──────────────────────────────────────────────────────────────────
   {
     code: '752',
-    nameAr: 'مشد ٧٥٢',
+    nameAr: 'مشد 752',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_752,
     availableSizes: ['S','M','L','XL','2XL','3XL','4XL'],
+    bodySliders: ['waist'],
     measurementDefs: [
       { key: 'waist',  labelAr: 'الخصر',       labelEn: 'Waist(CM)'       },
       { key: 'down',   labelAr: 'الطول',        labelEn: 'DOWN(CM)'        },
@@ -514,11 +518,12 @@ export const PRODUCTS: Product[] = [
   // ── 754-1 ─────────────────────────────────────────────────────────────────
   {
     code: '754-1',
-    nameAr: 'مشد ٧٥٤',
+    nameAr: 'مشد 754',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_754,
     availableSizes: ['S','M','L','XL','2XL','3XL','4XL'],
+    bodySliders: ['waist'],
     measurementDefs: [
       { key: 'waist',  labelAr: 'الخصر',       labelEn: 'Waist(CM)'       },
       { key: 'down',   labelAr: 'الطول',        labelEn: 'DOWN(CM)'        },
@@ -538,11 +543,13 @@ export const PRODUCTS: Product[] = [
   // ── 811 ──────────────────────────────────────────────────────────────────
   {
     code: '811',
-    nameAr: 'مشد ٨١١',
+    nameAr: 'مشد 811',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_811,
     availableSizes: ['XS','S','M','L','XL','2XL','3XL','4XL'],
+    bodySliders: ['chest', 'waist'],
+    gender: 'male',
     measurementDefs: [
       { key: 'down',      labelAr: 'الطول',       labelEn: 'DOWN(CM)'              },
       { key: 'waist',     labelAr: 'الخصر',        labelEn: 'Waist(CM)'             },
@@ -563,11 +570,12 @@ export const PRODUCTS: Product[] = [
   // ── 670 ──────────────────────────────────────────────────────────────────
   {
     code: '670',
-    nameAr: 'مشد ٦٧٠',
+    nameAr: 'مشد 670',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_670,
     availableSizes: ['S','M','L','XL','2XL'],
+    bodySliders: ['chest'],
     measurementDefs: [
       { key: 'down',      labelAr: 'الطول',       labelEn: 'DOWN(CM)'              },
       { key: 'chest',     labelAr: 'الصدر',        labelEn: '(CM)Chest "O"'         },
@@ -586,7 +594,7 @@ export const PRODUCTS: Product[] = [
   // Special algorithm: size determined by height range + weight threshold
   {
     code: '1010',
-    nameAr: 'مشد ١٠١٠',
+    nameAr: 'مشد 1010',
     category: 'مشد',
     categoryIcon: '🩱',
     sizeGroup: GROUP_670, // placeholder (customCalculate overrides)

@@ -19,8 +19,16 @@ interface BodyStats {
   chest:    number;
   waist:    number;
   hips:     number;
+  arms:     number;
   skinTone: string;
 }
+
+const SLIDER_DEFS = {
+  chest: { label: "الصدر", key: "chest" as const, min: 70,  max: 130 },
+  waist: { label: "الخصر", key: "waist" as const, min: 50,  max: 120 },
+  hips:  { label: "الورك", key: "hips"  as const, min: 70,  max: 140 },
+  arms:  { label: "الأكمام", key: "arms" as const, min: 20, max: 60  },
+};
 
 const SKIN_TONES = [
   "#f5d0b0", "#eac096", "#d4956a", "#c27843", "#8d5524", "#573315",
@@ -49,9 +57,13 @@ export default function FittingRoom({ product, onBack }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [stats, setStats] = useState<BodyStats>({
     height: 165, weight: 65,
-    chest: 90, waist: 70, hips: 95,
+    chest: 90, waist: 70, hips: 95, arms: 30,
     skinTone: SKIN_TONES[0],
   });
+
+  const isMale      = product.gender === 'male';
+  const activeSliders = (product.bodySliders ?? ['chest', 'waist', 'hips'])
+    .map(k => SLIDER_DEFS[k]);
 
   const update = (key: keyof BodyStats, val: number | string) =>
     setStats(prev => ({ ...prev, [key]: val }));
@@ -70,7 +82,9 @@ export default function FittingRoom({ product, onBack }: Props) {
 
         {/* ── Branded header ────────────────────────────────────────── */}
         <div className="flex flex-col items-center gap-1 px-6 py-4 border-b border-gray-100 bg-white text-center">
-          <Image src="/logo.png" alt="ملكة الأزياء" width={160} height={64} className="object-contain" />
+          <button onClick={onBack} className="focus:outline-none" title="العودة للمنتجات">
+            <Image src="/logo.png" alt="ملكة الأزياء" width={160} height={64} className="object-contain hover:opacity-80 transition-opacity" />
+          </button>
           <p className="text-[10px] text-gray-400 tracking-widest uppercase">غرفة القياس الذكية</p>
         </div>
 
@@ -89,11 +103,6 @@ export default function FittingRoom({ product, onBack }: Props) {
                 <div className={`text-5xl font-black mb-0.5 ${ringClass.split(' ')[2]}`}>
                   {sizeNumber}
                 </div>
-                {sizeNumber !== sizeLabel && (
-                  <div className="text-gray-400 text-xs font-semibold tracking-widest uppercase">
-                    {sizeLabel}
-                  </div>
-                )}
                 <div className="text-gray-400 text-xs mt-1">المقاس المقترح</div>
               </div>
             )}
@@ -140,8 +149,8 @@ export default function FittingRoom({ product, onBack }: Props) {
                 <ArrowRight size={20} />
               </button>
               <h1 className="text-xl font-bold text-gray-800 flex-1 text-center">
-                {step === 1 && "أدخلي طولك ووزنك"}
-                {step === 2 && "اضبطي شكل المجسم"}
+                {step === 1 && (isMale ? "أدخل طولك ووزنك" : "أدخلي طولك ووزنك")}
+                {step === 2 && (isMale ? "اضبط شكل المجسم" : "اضبطي شكل المجسم")}
                 {step === 3 && "مقاسك المناسب"}
               </h1>
             </div>
@@ -170,16 +179,6 @@ export default function FittingRoom({ product, onBack }: Props) {
                     المقاس المتوقع حالياً
                   </div>
                   <div className="text-4xl font-black">{sizeNumber}</div>
-                  {sizeNumber !== sizeLabel && (
-                    <div className="text-xs mt-0.5 opacity-60 font-semibold">{sizeLabel}</div>
-                  )}
-                  {deviation !== 0 && (
-                    <div className="text-xs mt-2 opacity-50">
-                      {deviation > 0
-                        ? `وزنك أثقل بـ ${deviation} كغ من المعيار`
-                        : `وزنك أخف بـ ${-deviation} كغ من المعيار`}
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -188,32 +187,27 @@ export default function FittingRoom({ product, onBack }: Props) {
             {step === 2 && (
               <div className="space-y-6">
                 <p className="text-gray-400 text-sm text-center -mt-2">
-                  اختيارية — عدلي لرؤية شكل المجسم بدقة أكبر
+                  {isMale ? "اختياري — عدل لرؤية شكل المجسم" : "اختيارية — عدلي لرؤية شكل المجسم"}
                 </p>
 
-                {[
-                  { label: "الصدر", key: "chest" as const, min: 70, max: 130 },
-                  { label: "الخصر", key: "waist" as const, min: 50, max: 120 },
-                  { label: "الورك", key: "hips"  as const, min: 70, max: 140 },
-                ].map(item => (
+                {activeSliders.map(item => (
                   <div key={item.key}>
-                    <div className="flex justify-between mb-2">
+                    <div className="mb-2">
                       <span className="text-sm font-medium text-gray-700">{item.label}</span>
-                      <span className="text-sm text-gray-500">{stats[item.key]} سم</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={() => update(item.key, Math.max(item.min, stats[item.key] - 1))}
+                        onClick={() => update(item.key, Math.max(item.min, (stats[item.key] as number) - 1))}
                         className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-lg font-bold"
                       >−</button>
                       <input
                         type="range" min={item.min} max={item.max}
-                        value={stats[item.key]}
+                        value={stats[item.key] as number}
                         onChange={e => update(item.key, Number(e.target.value))}
                         className="flex-1 accent-black"
                       />
                       <button
-                        onClick={() => update(item.key, Math.min(item.max, stats[item.key] + 1))}
+                        onClick={() => update(item.key, Math.min(item.max, (stats[item.key] as number) + 1))}
                         className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-lg font-bold"
                       >+</button>
                     </div>
@@ -232,9 +226,6 @@ export default function FittingRoom({ product, onBack }: Props) {
                     المقاس الأنسب لكِ
                   </div>
                   <div className="text-6xl font-black leading-none">{sizeNumber}</div>
-                  {sizeNumber !== sizeLabel && (
-                    <div className="text-sm mt-1 font-bold opacity-50">{sizeLabel}</div>
-                  )}
                   <div className="text-xs mt-3 opacity-50">
                     طول {stats.height} سم · وزن {stats.weight} كغ
                   </div>
@@ -410,11 +401,6 @@ function SizeTable({ product, recommended }: { product: Product; recommended: Si
                 >
                   <td className="py-2 px-3 font-bold">
                     <span>{num}</span>
-                    {num !== lbl && (
-                      <span className={clsx("mr-1 font-normal", isRec ? "text-gray-300" : "text-gray-400")}>
-                        ({lbl})
-                      </span>
-                    )}
                     {isRec && <span className="mr-1 text-xs">✓</span>}
                   </td>
                   {defs.map(d => (
