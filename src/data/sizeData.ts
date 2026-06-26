@@ -238,6 +238,7 @@ export interface Product {
   customCalculate?: (height: number, weight: number) => SizeName;
   bodySliders?:    Array<'chest' | 'waist' | 'hips' | 'arms'>;
   gender?:         'female' | 'male';
+  isFaceProduct?:  boolean;
 }
 
 export function calculateSize(height: number, weight: number, product: Product): SizeName {
@@ -597,6 +598,8 @@ export const PRODUCTS: Product[] = [
     nameAr: 'مشد 1010',
     category: 'مشد',
     categoryIcon: '🩱',
+    isFaceProduct: true,
+    bodySliders: [],
     sizeGroup: GROUP_670, // placeholder (customCalculate overrides)
     availableSizes: ['S', 'XL'],
     note: '32/34 = S/M  •  36/38 = L/XL',

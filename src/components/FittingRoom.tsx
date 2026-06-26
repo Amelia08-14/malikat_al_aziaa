@@ -9,7 +9,6 @@ import {
   Product,
   SizeName,
   calculateSize,
-  getSizeDisplayLabel,
   getSizeNumber,
 } from "@/data/sizeData";
 
@@ -53,6 +52,29 @@ interface Props {
   onBack:  () => void;
 }
 
+function findBestSizeByMeas(
+  product: Product,
+  entered: Record<string, string>,
+): SizeName | null {
+  const keys = product.measurementDefs.map(d => d.key).filter(k => {
+    const v = Number(entered[k]);
+    return entered[k] !== '' && !isNaN(v) && v > 0;
+  });
+  if (keys.length === 0) return null;
+  let bestSize: SizeName | null = null;
+  let bestScore = Infinity;
+  for (const size of product.availableSizes) {
+    const row = product.measurements[size] ?? {};
+    let score = 0; let count = 0;
+    for (const k of keys) {
+      const tv = row[k];
+      if (tv !== undefined) { score += Math.abs(Number(entered[k]) - tv); count++; }
+    }
+    if (count > 0 && score < bestScore) { bestScore = score; bestSize = size; }
+  }
+  return bestSize;
+}
+
 export default function FittingRoom({ product, onBack }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [stats, setStats] = useState<BodyStats>({
@@ -60,21 +82,23 @@ export default function FittingRoom({ product, onBack }: Props) {
     chest: 90, waist: 70, hips: 95, arms: 30,
     skinTone: SKIN_TONES[0],
   });
+  const [showVerify, setShowVerify]     = useState(false);
+  const [manualMeas, setManualMeas]     = useState<Record<string, string>>({});
 
-  const isMale      = product.gender === 'male';
+  const isMale        = product.gender === 'male';
+  const isFace        = !!product.isFaceProduct;
   const activeSliders = (product.bodySliders ?? ['chest', 'waist', 'hips'])
     .map(k => SLIDER_DEFS[k]);
 
   const update = (key: keyof BodyStats, val: number | string) =>
     setStats(prev => ({ ...prev, [key]: val }));
+  const updateMeas = (key: string, val: string) =>
+    setManualMeas(prev => ({ ...prev, [key]: val }));
 
-  const recommendedSize: SizeName = calculateSize(stats.height, stats.weight, product);
-  const sizeNumber   = getSizeNumber(recommendedSize, product);
-  const sizeLabel    = getSizeDisplayLabel(recommendedSize, product);
-  const productMeas  = product.measurements[recommendedSize] ?? {};
-  const stdWeight    = stats.height - 100;
-  const deviation    = stats.weight - stdWeight;
-  const ringClass    = SIZE_RING[recommendedSize] ?? "border-gray-200 bg-gray-50 text-gray-800";
+  const recommendedSize  = calculateSize(stats.height, stats.weight, product);
+  const sizeNumber       = getSizeNumber(recommendedSize, product);
+  const ringClass        = SIZE_RING[recommendedSize] ?? "border-gray-200 bg-gray-50 text-gray-800";
+  const bestManualSize   = findBestSizeByMeas(product, manualMeas);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 font-[family-name:var(--font-cairo)]">
@@ -186,40 +210,57 @@ export default function FittingRoom({ product, onBack }: Props) {
             {/* ── STEP 2: Body fine-tune ── */}
             {step === 2 && (
               <div className="space-y-6">
-                <p className="text-gray-400 text-sm text-center -mt-2">
-                  {isMale ? "اختياري — عدل لرؤية شكل المجسم" : "اختيارية — عدلي لرؤية شكل المجسم"}
-                </p>
-
-                {activeSliders.map(item => (
-                  <div key={item.key}>
-                    <div className="mb-2">
-                      <span className="text-sm font-medium text-gray-700">{item.label}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => update(item.key, Math.max(item.min, (stats[item.key] as number) - 1))}
-                        className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-lg font-bold"
-                      >−</button>
-                      <input
-                        type="range" min={item.min} max={item.max}
-                        value={stats[item.key] as number}
-                        onChange={e => update(item.key, Number(e.target.value))}
-                        className="flex-1 accent-black"
-                      />
-                      <button
-                        onClick={() => update(item.key, Math.min(item.max, (stats[item.key] as number) + 1))}
-                        className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-lg font-bold"
-                      >+</button>
-                    </div>
+                {isFace ? (
+                  /* ── Special case: face/neck product (1010) ── */
+                  <div className="text-center space-y-4 pt-4">
+                    <div className="text-5xl">🫥</div>
+                    <p className="text-sm font-semibold text-gray-700">مشد اللغلوغ</p>
+                    <p className="text-xs text-gray-400 leading-6">
+                      المقاس يُحدد حسب الطول والوزن.<br/>
+                      لمزيد من الدقة يمكنك في الخطوة التالية إدخال<br/>
+                      <strong>محيط الرقبة</strong> و <strong>طول الرأس من فروة الرأس إلى الرقبة</strong>
+                    </p>
                   </div>
-                ))}
-
+                ) : activeSliders.length === 0 ? (
+                  <p className="text-gray-400 text-sm text-center pt-8">
+                    يمكنك المتابعة مباشرة لعرض النتيجة
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-gray-400 text-sm text-center -mt-2">
+                      {isMale ? "اختياري — عدل لرؤية شكل المجسم" : "اختيارية — عدلي لرؤية شكل المجسم"}
+                    </p>
+                    {activeSliders.map(item => (
+                      <div key={item.key}>
+                        <div className="mb-2">
+                          <span className="text-sm font-medium text-gray-700">{item.label}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => update(item.key, Math.max(item.min, (stats[item.key] as number) - 1))}
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-lg font-bold"
+                          >−</button>
+                          <input
+                            type="range" min={item.min} max={item.max}
+                            value={stats[item.key] as number}
+                            onChange={e => update(item.key, Number(e.target.value))}
+                            className="flex-1 accent-black"
+                          />
+                          <button
+                            onClick={() => update(item.key, Math.min(item.max, (stats[item.key] as number) + 1))}
+                            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-lg font-bold"
+                          >+</button>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             )}
 
             {/* ── STEP 3: Results ── */}
             {step === 3 && (
-              <div className="space-y-5">
+              <div className="space-y-4">
                 {/* Main result card */}
                 <div className={`rounded-2xl border-2 p-6 text-center ${ringClass}`}>
                   <div className="text-xs font-semibold uppercase tracking-widest mb-2 opacity-60">
@@ -231,38 +272,67 @@ export default function FittingRoom({ product, onBack }: Props) {
                   </div>
                 </div>
 
-                {/* Measurements table */}
-                {Object.keys(productMeas).length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Ruler size={15} className="text-gray-400" />
-                      <span className="text-sm font-semibold text-gray-700">
-                        مقاسات المنتج — مقاس {sizeNumber}
-                      </span>
-                      <span className="text-xs text-gray-400">(نصف مسطح، سم)</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      {product.measurementDefs.map(def => {
-                        const val = productMeas[def.key];
-                        if (val === undefined) return null;
-                        return (
-                          <div key={def.key} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
-                            <div className="text-lg font-bold text-gray-900">{val}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">{def.labelAr}</div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Full size table */}
-                <SizeTable product={product} recommended={recommendedSize} />
-
                 {product.note && (
                   <div className="flex items-center gap-2 text-xs text-gray-400 bg-gray-50 rounded-lg p-3">
                     <Info size={13} />
                     {product.note}
+                  </div>
+                )}
+
+                {/* ── Verify button (point 9) ── */}
+                {!showVerify && (
+                  <button
+                    onClick={() => setShowVerify(true)}
+                    className="w-full py-3 rounded-xl border-2 border-dashed border-gray-300 text-sm font-semibold text-gray-500 hover:border-gray-500 hover:text-gray-800 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Ruler size={15} />
+                    {isMale ? "تحقق من مقاسك بالسنتيمتر" : "تحققي من مقاسك بالسنتيمتر"}
+                  </button>
+                )}
+
+                {/* ── Manual measurement section (points 9 & 10) ── */}
+                {showVerify && (
+                  <div className="space-y-4 border-t border-gray-100 pt-4">
+                    <p className="text-sm font-semibold text-gray-700">
+                      {isMale ? "أدخل مقاساتك (نصف مسطح، سم)" : "أدخلي مقاساتك (نصف مسطح، سم)"}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {product.measurementDefs.map(def => (
+                        <div key={def.key}>
+                          <label className="block text-xs text-gray-500 mb-1 text-center">{def.labelAr}</label>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="—"
+                            value={manualMeas[def.key] ?? ''}
+                            onChange={e => updateMeas(def.key, e.target.value)}
+                            className="w-full text-center text-sm font-bold p-2 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-black focus:border-black outline-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Best match from manual */}
+                    {bestManualSize && (
+                      <div className={clsx(
+                        "rounded-xl border-2 p-3 text-center text-sm font-bold",
+                        SIZE_RING[bestManualSize] ?? "border-gray-200 bg-gray-50 text-gray-800"
+                      )}>
+                        مقاسك من القياسات: {getSizeNumber(bestManualSize, product)}
+                        {bestManualSize !== recommendedSize && (
+                          <span className="block text-xs font-normal opacity-70 mt-0.5">
+                            يختلف عن المقترح ({sizeNumber}) — راجعي الجدول أدناه
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Full table only shown here */}
+                    <SizeTable
+                      product={product}
+                      recommended={recommendedSize}
+                      manualMatch={bestManualSize ?? undefined}
+                    />
                   </div>
                 )}
               </div>
@@ -363,7 +433,11 @@ function NumberInput({ label, value, min, max, onChange }: {
   );
 }
 
-function SizeTable({ product, recommended }: { product: Product; recommended: SizeName }) {
+function SizeTable({
+  product, recommended, manualMatch,
+}: {
+  product: Product; recommended: SizeName; manualMatch?: SizeName;
+}) {
   const sizes = product.availableSizes;
   const defs  = product.measurementDefs;
 
@@ -387,26 +461,27 @@ function SizeTable({ product, recommended }: { product: Product; recommended: Si
           </thead>
           <tbody>
             {sizes.map(size => {
-              const m     = product.measurements[size] ?? {};
-              const isRec = size === recommended;
-              const num   = getSizeNumber(size, product);
-              const lbl   = getSizeDisplayLabel(size, product);
+              const m          = product.measurements[size] ?? {};
+              const isRec      = size === recommended;
+              const isManual   = manualMatch && size === manualMatch && size !== recommended;
+              const num        = getSizeNumber(size, product);
               return (
                 <tr
                   key={size}
                   className={clsx(
                     "border-t border-gray-50 transition-colors",
-                    isRec ? "bg-black text-white font-bold" : "hover:bg-gray-50"
+                    isRec    ? "bg-black text-white font-bold" :
+                    isManual ? "bg-blue-50 text-blue-900 font-semibold" :
+                               "hover:bg-gray-50"
                   )}
                 >
                   <td className="py-2 px-3 font-bold">
                     <span>{num}</span>
-                    {isRec && <span className="mr-1 text-xs">✓</span>}
+                    {isRec    && <span className="mr-1 text-xs">✓</span>}
+                    {isManual && <span className="mr-1 text-xs">📏</span>}
                   </td>
                   {defs.map(d => (
-                    <td key={d.key} className="py-2 px-3">
-                      {m[d.key] ?? "—"}
-                    </td>
+                    <td key={d.key} className="py-2 px-3">{m[d.key] ?? "—"}</td>
                   ))}
                 </tr>
               );
