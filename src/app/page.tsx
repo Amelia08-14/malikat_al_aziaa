@@ -29,11 +29,8 @@ const BUTTONS = [
     href: "https://snapchat.com/t/zC4tDL01",
     bg: "#FFFC00",
     textColor: "#000",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12.206.793c.99 0 4.347.276 5.93 3.821.529 1.193.403 3.219.299 4.847l-.003.06c-.012.18-.022.345-.03.51.002.068.064.208.142.23 1.104.322 2.384-.104 3.01-.507.19-.12.38-.144.49-.104.21.08.34.304.25.54-.23.62-.96 1.08-1.68 1.35-.18.065-.36.13-.54.18-.41.118-.74.213-.81.535-.04.178.06.38.23.533 1.48 1.408 2.64 3.68 3.05 5.87.07.357-.21.498-.51.504-.13 0-.28-.028-.44-.063-.56-.12-1.41-.303-2.73-.303a10.3 10.3 0 00-1.59.128c-.17.026-.33.06-.49.086-1.09.192-2.17.35-3.24.35-.88 0-1.52-.108-2.35-.35-.17-.05-.34-.082-.51-.11a10.35 10.35 0 00-1.59-.128c-1.32 0-2.17.183-2.73.303-.16.035-.31.063-.44.063-.3-.006-.58-.147-.51-.504.41-2.19 1.57-4.462 3.05-5.87.17-.153.27-.355.23-.533-.07-.322-.4-.417-.81-.535-.18-.05-.36-.115-.54-.18-.72-.27-1.45-.73-1.68-1.35-.09-.236.04-.46.25-.54.11-.04.3-.016.49.104.626.403 1.906.829 3.01.507.078-.022.14-.162.142-.23l-.03-.51c-.104-1.628-.23-3.654.3-4.847C7.859 1.069 11.216.793 12.206.793z" />
-      </svg>
-    ),
+    // eslint-disable-next-line @next/next/no-img-element
+    icon: <img src="/snapchat-logo.svg" alt="Snapchat" width={22} height={22} style={{ borderRadius: 4 }} />,
   },
   {
     label: "TikTok",
@@ -91,7 +88,7 @@ export default function Home() {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-3 px-5 py-3.5 rounded-2xl font-semibold text-sm transition-all duration-200 hover:opacity-90 active:scale-95"
+              className="flex items-center justify-center gap-3 px-5 py-3.5 rounded-2xl font-semibold text-sm transition-all duration-200 hover:opacity-90 active:scale-95"
               style={{
                 background: bg,
                 color: textColor,
@@ -119,7 +116,7 @@ export default function Home() {
           }}
         >
           <span className="text-xl">👗</span>
-          غرفة القياس
+          غرفة القياس الذكية
         </Link>
       </div>
 
