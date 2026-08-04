@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
 import { Cairo } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
 const cairo = Cairo({
   variable: "--font-cairo",
   subsets: ["arabic"],
+  display: "swap",
+});
+
+const somar = localFont({
+  src: "../../public/font/Somar.otf",
+  variable: "--font-somar",
   display: "swap",
 });
 
@@ -57,7 +64,7 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body
-        className={`${cairo.variable} antialiased font-sans bg-gray-50`}
+        className={`${cairo.variable} ${somar.variable} antialiased font-sans bg-gray-50`}
         suppressHydrationWarning
       >
         {children}
